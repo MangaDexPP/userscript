@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MangaDex++
 // @namespace    https://github.com/MangaDexPP/userscript
-// @version      1.0.1
+// @version      1.0.2
 // @description  QOL stuff for MD
 // @match        https://mangadex.org/*
 // @match        http://mangadex.org/*
@@ -15,6 +15,7 @@
 
 //-------------------UNIVERSAL--------------------//
 const POLLING_TIME          = 100;
+const HTML_REQUEST_INTERVAL = 1000;
 
 //--------------------TRACKER---------------------//
 const READ_BUTTON_COLOR     = "#13ab493d";
@@ -28,6 +29,7 @@ const DOES_HIDE_ALL_READ = true;
 //------------------BLOCK USERS-------------------//
 const USER_LIST = [];
 const GROUP_LIST = [];
+const TAG_LIST = ["boys' love"]; // IMPORTANT: Use all lowercase
 
 //------------------------------------------------//
 //------------------DO NOT TOUCH------------------//
@@ -37,6 +39,8 @@ var hideRead = false;
 var hideIgnore = true;
 var hideUnmarked = false;
 var hideAllRead = true;
+var forceRecheckNewEntry = false;
+var queue = [];
 
 const CATEGORY_FEED     = "/titles/feed";
 const CATEGORY_FOLLOWS  = "/titles/follows";
@@ -95,9 +99,16 @@ function getFormat(pathname) {
 (function() {
     "use strict";
     main();
+    handle_queue();
 })();
 
 function main() {
+    var lastTagList = window.localStorage.getItem("_conf_tags");
+    var currentTagList = TAG_LIST.toLocaleString();
+    if (lastTagList != currentTagList) {
+        forceRecheckNewEntry = true;
+        window.localStorage.setItem("_conf_tags", currentTagList);
+    }
     handleBaseUrl(window.location.href);
     setTimeout(main, POLLING_TIME);
 }
@@ -117,7 +128,7 @@ function handleBaseUrl(baseUrl) {
 
     addControllers();
     addButtons(format);
-    categorize(format);
+    categorize(format, url.pathname.startsWith(CATEGORY_LATEST));
 }
 
 //------------------------------------------------//
@@ -407,7 +418,7 @@ function addButtonsForDetailFormat() {
     addButtonsForElement(entryID, entry, FORMAT_DETAIL);
 }
 
-function categorize(format) {
+function categorize(format, isLatestPage) {
     if (format === FORMAT_NOT_FOUND) {
         return;
     }
@@ -438,14 +449,15 @@ function categorize(format) {
                     break;
             }
 
-            if (window.localStorage.getItem(entryID) === "-1") {
+            var flag = window.localStorage.getItem(entryID);
+            if (flag === "-1") {
                 button1.style.setProperty(
                     "background-color",
                     "transparent"
                 );
                 button2.style.setProperty("background-color", IGNORE_BUTTON_COLOR);
                 toggleVisibility(displayElement, !hideIgnore);
-            } else if (window.localStorage.getItem(entryID) === "1") {
+            } else if (flag === "1") {
                 button1.style.setProperty("background-color", READ_BUTTON_COLOR);
                 button2.style.setProperty(
                     "background-color",
@@ -462,6 +474,10 @@ function categorize(format) {
                     "transparent"
                 );
                 toggleVisibility(displayElement, !hideUnmarked);
+                // Check all new entries and ignore if blacklisted tag
+                if (isLatestPage && (flag === null || forceRecheckNewEntry) && !queue.includes(entryID)) {
+                    queue.push(entryID);
+                }
             }
         }
     }
@@ -496,6 +512,51 @@ function clearEntry(event) {
     if (window.localStorage.getItem(entryID) !== null) {
         window.localStorage.removeItem(entryID);
     }
+}
+
+function handle_queue() {
+    if (queue.length > 0) {
+        var entryID = queue.shift();
+        console.debug("Popped ID " + entryID);
+        checkPage(entryID);
+    }
+    setTimeout(handle_queue, HTML_REQUEST_INTERVAL);
+}
+
+function checkPage(entryID) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', "https://api.mangadex.org/manga/" + entryID, true);
+    xhr.onload = function () {
+    if (xhr.status >= 200 && xhr.status < 300) {
+        var metadata = JSON.parse(xhr.responseText);
+        parseAndHandleEntry(entryID, metadata);
+    } else {
+        console.error('Failed to fetch entry ' + entryID + ' with status ' + xhr.status);
+    }
+  };
+  xhr.onerror = function () {
+      console.error('Failed to fetch entry ' + entryID);
+  };
+  xhr.send();
+}
+
+function parseAndHandleEntry(entryID, metadata) {
+    if (metadata["result"] != "ok") {
+        console.error('Failed to fetch entry ' + entryID);
+        return;
+    }
+    var tags = metadata["data"]["attributes"]["tags"];
+    for (var i = 0; i < tags.length; i++) {
+        var tag = tags[i]["attributes"]["name"]["en"].toLowerCase();
+        // Blacklisted tag
+        if (TAG_LIST.includes(tag)) {
+            console.log("Ignore " + entryID + " due to blacklisted tag: " + tag);
+            window.localStorage.setItem(entryID, -1);
+            return;
+        }
+    }
+    // Checked, but do nothing about it
+    window.localStorage.setItem(entryID, -2);
 }
 
 //------------------------------------------------//
