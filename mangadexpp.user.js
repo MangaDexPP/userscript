@@ -15,7 +15,7 @@
 
 //-------------------UNIVERSAL--------------------//
 const POLLING_TIME          = 100;
-const HTML_REQUEST_INTERVAL = 1000;
+const API_REQUEST_INTERVAL  = 1000;
 
 //--------------------TRACKER---------------------//
 const READ_BUTTON_COLOR     = "#13ab493d";
@@ -520,7 +520,7 @@ function handle_queue() {
         console.debug("Popped ID " + entryID);
         checkPage(entryID);
     }
-    setTimeout(handle_queue, HTML_REQUEST_INTERVAL);
+    setTimeout(handle_queue, API_REQUEST_INTERVAL);
 }
 
 function checkPage(entryID) {
