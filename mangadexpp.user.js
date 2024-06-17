@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         MangaDex++
 // @namespace    https://github.com/MangaDexPP/userscript
-// @version      1.0.2
+// @version      1.0.3
 // @description  QOL stuff for MD
 // @match        https://mangadex.org/*
 // @match        http://mangadex.org/*
@@ -580,8 +580,8 @@ function blockUsers(format) {
     // Should work for both chapter listing in feeds and in manga page
     var chapterRows = document.querySelectorAll(".chapter-grid.flex-grow");
     for (var i = 0; i < chapterRows.length; i++) {
-        var row = chapterRows[i];
-        if (USER_LIST.includes(row.querySelector(".line-clamp-1").innerText) || GROUP_LIST.includes(row.querySelector(".group-tag").innerText)) {
+        var uploader = row.querySelector("a.line-clamp-1");
+        if ((uploader != null && USER_LIST.includes(uploader.innerText)) || GROUP_LIST.includes(row.querySelector(".group-tag").innerText)) {
             row.parentNode.parentNode.removeChild(row.parentNode);
         }
     }
