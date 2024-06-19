@@ -580,6 +580,7 @@ function blockUsers(format) {
     // Should work for both chapter listing in feeds and in manga page
     var chapterRows = document.querySelectorAll(".chapter-grid.flex-grow");
     for (var i = 0; i < chapterRows.length; i++) {
+        var row = chapterRows[i];
         var uploader = row.querySelector(".user-tag > .line-clamp-1");
         if ((uploader != null && USER_LIST.includes(uploader.innerText)) || GROUP_LIST.includes(row.querySelector(".group-tag").innerText)) {
             row.parentNode.parentNode.removeChild(row.parentNode);
